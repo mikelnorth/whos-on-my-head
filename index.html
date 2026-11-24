@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b5ed7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="On My Head">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<title>Who's on my head?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: loud, sunny, kid-friendly — a theme-park game card
+   IDEA: a big picture card held up to the crowd
+   PICTURE: the character card itself fills the screen
+   COLOUR/TYPE: royal blue sky, sunshine yellow, go-green and coral; Fredoka
+   LAYOUT: one job per screen; works sideways and upright */
+:root{--blue:#0b5ed7;--deep:#073f94;--sun:#ffd23f;--go:#18b85a;--skip:#ff6a3d;--ink:#10213f;color-scheme:light}
+*{box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{background:radial-gradient(120% 90% at 50% 0%,#2f86ff 0,var(--blue) 45%,var(--deep) 100%) fixed;color:#fff;
+  font:500 17px/1.4 Fredoka,"Trebuchet MS",system-ui,sans-serif;overflow:hidden;touch-action:manipulation;
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:4px solid var(--sun);outline-offset:3px}
+.screen{position:fixed;inset:0;display:none;flex-direction:column;
+  padding:max(14px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left))}
+.screen.on{display:flex}
+.center{align-items:center;justify-content:center;text-align:center}
+.scrolly{overflow-y:auto;-webkit-overflow-scrolling:touch}
+
+/* Home */
+.home-in{width:100%;max-width:980px;margin:auto;display:grid;gap:18px;padding-block:8px}
+.brand{display:flex;align-items:center;gap:16px}
+.brand svg{width:clamp(64px,16vw,96px);height:auto;flex:none;filter:drop-shadow(0 5px 0 rgba(0,0,0,.2))}
+h1{font-size:clamp(34px,8vw,52px);line-height:1.02;margin:0;font-weight:700;text-wrap:balance}
+.brand p{margin:4px 0 0;opacity:.9}
+.panel{background:rgba(0,20,70,.28);border-radius:22px;padding:16px;display:grid;gap:10px}
+h2{font-size:15px;margin:4px 0 0;font-weight:600;opacity:.85}
+.seg,.chips,.opts{display:flex;flex-wrap:wrap;gap:8px}
+.seg button,.chip,.opt{min-height:46px;border-radius:999px;border:2px solid rgba(255,255,255,.55);background:transparent;padding:6px 16px;font-weight:600}
+.seg button[aria-pressed=true],.chip[aria-pressed=true],.opt[aria-pressed=true]{background:#fff;color:var(--deep);border-color:#fff}
+.chip small{opacity:.7;font-weight:500}
+.big{min-height:72px;border:0;border-radius:22px;background:var(--sun);color:var(--ink);font-size:30px;font-weight:700;
+  box-shadow:0 7px 0 #c99a00;width:100%}
+.big:active{transform:translateY(4px);box-shadow:0 3px 0 #c99a00}
+.ghost{min-height:52px;border-radius:18px;border:2px solid rgba(255,255,255,.7);background:transparent;font-weight:600;padding:8px 20px}
+.how{margin:0;padding-left:22px;display:grid;gap:4px;opacity:.95}
+.fine{font-size:13px;opacity:.75;margin:0}
+.side{display:grid;gap:12px;align-content:start}
+.brand{grid-area:brand}.panel{grid-area:panel}#startBtn{grid-area:play}.side{grid-area:side}
+.home-in{grid-template-areas:"brand" "play" "panel" "side"}
+@media (min-width:700px) and (orientation:landscape){.home-in{grid-template-columns:1.1fr .9fr;grid-template-areas:"brand brand" "panel play" "panel side";align-items:start}}
+
+/* Countdown */
+#count{gap:6px}
+.banner{min-height:54px;font-size:30px;font-weight:700;padding:6px 26px;border-radius:999px;visibility:hidden}
+.banner.ok{visibility:visible;background:var(--go)}.banner.skip{visibility:visible;background:var(--skip)}
+.cdnum{font-size:clamp(130px,42vmin,280px);line-height:1;font-weight:700;color:var(--sun);text-shadow:0 8px 0 rgba(0,0,0,.2);font-variant-numeric:tabular-nums}
+.cdnum.pop{animation:pop .45s ease-out}
+@keyframes pop{from{transform:scale(1.45);opacity:.3}to{transform:scale(1);opacity:1}}
+#cdMsg{font-size:clamp(22px,6vmin,34px);font-weight:600;margin:0}
+.cd-clock{margin:4px 0 0;font-size:18px;opacity:.85}
+.spinner{width:64px;height:64px;border-radius:50%;border:7px solid rgba(255,255,255,.25);border-top-color:var(--sun);animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(1turn)}}
+
+/* Play */
+#play{gap:10px}
+.hud{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.clock{font-size:clamp(28px,8vmin,52px);font-weight:700;font-variant-numeric:tabular-nums;background:rgba(0,0,0,.25);padding:0 20px;border-radius:999px;line-height:1.25}
+.clock.hot{background:#e02a2a;animation:throb 1s ease-in-out infinite}
+@keyframes throb{50%{transform:scale(1.08)}}
+.iconbtn{width:52px;height:52px;border-radius:50%;border:2px solid rgba(255,255,255,.7);background:rgba(0,0,0,.15);display:grid;place-items:center;flex:none}
+.score{font-size:clamp(22px,6vmin,36px);font-weight:700;min-width:52px;text-align:right}
+.stage{flex:1;margin:0;background:#fff;border-radius:26px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:12px;box-shadow:0 8px 0 rgba(0,0,0,.18);min-height:0;position:relative;overflow:hidden}
+.stage img{flex:1;min-height:0;width:100%;object-fit:contain}
+.stage figcaption{color:var(--ink);font-size:clamp(20px,6vmin,40px);font-weight:700;line-height:1.1;text-align:center;padding-top:6px}
+.stage.nameonly figcaption{font-size:clamp(40px,13vmin,96px);padding:0}
+.stage.nameonly img{display:none}
+.acts{display:flex;gap:14px;padding-inline:clamp(0px,9vw,140px)}
+.act{flex:1;min-height:clamp(64px,15vmin,96px);font-size:clamp(24px,6.5vmin,38px);border-radius:22px;border:0;color:#fff;font-weight:700;box-shadow:0 6px 0 rgba(0,0,0,.25);transition:opacity .2s}
+.act:active{transform:translateY(4px);box-shadow:0 2px 0 rgba(0,0,0,.25)}
+.ok{background:var(--go)}.skip{background:var(--skip)}
+.acts.wait .act{opacity:.45}
+.timesup{position:absolute;inset:0;display:none;place-items:center;background:rgba(224,42,42,.92);color:#fff;font-size:clamp(48px,14vmin,110px);font-weight:700;z-index:3;text-align:center}
+#play.over .timesup{display:grid}
+@media (orientation:landscape) and (max-height:520px){
+  #play{gap:6px;padding-top:max(8px,env(safe-area-inset-top));padding-bottom:max(8px,env(safe-area-inset-bottom))}
+  .iconbtn{width:44px;height:44px}.clock{padding:0 16px}
+  .stage{padding:8px;border-radius:20px}.act{min-height:60px}
+}
+
+/* Pause */
+#pause{background:rgba(5,25,70,.94);gap:14px;z-index:5}
+#pause h2{font-size:44px;opacity:1;margin:0}
+#pause .big{max-width:360px}
+#pause .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+
+/* Loading */
+#loading{gap:16px}
+.bar{width:min(320px,80vw);height:14px;border-radius:999px;background:rgba(255,255,255,.2);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--sun);transition:width .2s}
+#loadErr{display:grid;gap:10px;max-width:420px}
+#loadErr[hidden]{display:none}
+
+/* Results */
+.res-in{width:100%;max-width:820px;margin:0 auto;display:grid;gap:14px;padding-block:6px}
+.kicker{margin:0;font-size:22px;font-weight:600;color:var(--sun)}
+.big-score{display:flex;align-items:baseline;gap:12px;font-weight:700}
+.big-score b{font-size:clamp(72px,20vmin,120px);line-height:1}
+.big-score small{font-size:26px}
+#resNote{margin:0;opacity:.9}
+.res-list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+.res-list li{background:#fff;color:var(--ink);border-radius:16px;padding:8px;display:grid;gap:4px;justify-items:center;text-align:center;position:relative}
+.res-list img{width:100%;height:90px;object-fit:contain}
+.res-list span{font-size:15px;font-weight:600;line-height:1.15}
+.res-list em{position:absolute;top:6px;right:6px;font-style:normal;font-size:13px;font-weight:700;color:#fff;border-radius:999px;padding:1px 8px}
+.res-list .r-ok em{background:var(--go)}.res-list .r-skip em{background:var(--skip)}.res-list .r-time em{background:#7a869e}
+.res-list .r-skip,.res-list .r-time{opacity:.75}
+.res-btns{display:grid;grid-template-columns:2fr 1fr;gap:10px}
+
+/* Gallery */
+.gal-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.gal-head h2{font-size:24px;opacity:1;margin:0}
+.gal-tip{margin:6px 0 10px;opacity:.9}
+.gal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px;padding-bottom:20px}
+.tile{background:#fff;color:var(--ink);border:0;border-radius:16px;padding:8px;display:grid;gap:4px;justify-items:center;font-size:14px;font-weight:600;line-height:1.15;position:relative;min-height:44px}
+.tile img,.tile .ph{width:100%;height:84px;object-fit:contain}
+.tile .ph{display:grid;place-items:center;background:#eef2fa;border-radius:10px;color:#6b7891;font-size:12px}
+.tile.off{opacity:.35}.tile.off::after{content:"Off";position:absolute;top:6px;right:6px;background:var(--ink);color:#fff;border-radius:999px;padding:1px 8px;font-size:12px}
+.gal-group{grid-column:1/-1;margin:10px 0 0;font-size:18px;font-weight:700}
+
+@media (prefers-reduced-motion:reduce){.cdnum.pop,.clock.hot,.spinner{animation:none}}
+</style>
+</head>
+<body>
+
+<section id="home" class="screen on scrolly">
+  <div class="home-in">
+    <header class="brand">
+      <svg viewBox="0 0 100 100" aria-hidden="true"><polygon fill="#ffd23f" points="50,4 61.8,36 96,37.6 69,59 78.4,92 50,73 21.6,92 31,59 4,37.6 38.2,36"/><text x="50" y="64" text-anchor="middle" font-family="Fredoka,sans-serif" font-weight="700" font-size="40" fill="#073f94">?</text></svg>
+      <div>
+        <h1>Who's on my head?</h1>
+        <p>Guess the character while you wait in line.</p>
+      </div>
+    </header>
+    <div class="panel">
+      <h2>Round length</h2>
+      <div class="seg" id="lenSeg"></div>
+      <h2>Characters</h2>
+      <div class="chips" id="deckChips"></div>
+      <h2>Options</h2>
+      <div class="opts">
+        <button class="opt" id="optNames" aria-pressed="true">Show name under picture</button>
+        <button class="opt" id="optSound" aria-pressed="true">Sounds</button>
+      </div>
+    </div>
+    <button id="startBtn" class="big">Play!</button>
+    <div class="side">
+      <button id="galleryBtn" class="ghost">See all the characters</button>
+      <ol class="how">
+        <li>Turn the phone sideways and tap <b>Play</b>.</li>
+        <li>During the 3-2-1, hold it on your forehead, screen facing out.</li>
+        <li>Everyone else describes the character in the picture.</li>
+        <li>Got it? Bring the phone down and tap <b>Correct</b> or <b>Skip</b>. The clock stops while you get ready for the next one.</li>
+      </ol>
+      <p class="fine" id="bestLine"></p>
+      <p class="fine">A fan-made game, not affiliated with Disney. Pictures load from Wikipedia and the Disney fan wiki the first time you play; after that, most are saved on your phone.</p>
+    </div>
+  </div>
+</section>
+
+<section id="loading" class="screen center">
+  <div class="spinner" id="loadSpin"></div>
+  <p id="loadMsg">Getting the pictures ready…</p>
+  <div class="bar"><i id="loadBar"></i></div>
+  <div id="loadErr" hidden>
+    <p>Couldn't load the character pictures. Check your signal or Wi-Fi and try again.</p>
+    <button id="retryBtn" class="big">Try again</button>
+    <button id="namesOnlyBtn" class="ghost">Play with names only</button>
+    <button id="loadHome" class="ghost">Back</button>
+  </div>
+</section>
+
+<section id="count" class="screen center">
+  <div id="cdBanner" class="banner"></div>
+  <div id="cdNum" class="cdnum">3</div>
+  <p id="cdMsg">Put it on your forehead!</p>
+  <p class="cd-clock"><span id="cdClock">1:00</span> left · clock paused</p>
+</section>
+
+<section id="play" class="screen">
+  <div class="hud">
+    <button class="iconbtn" id="pauseBtn" aria-label="Pause"><svg width="20" height="22" viewBox="0 0 20 22" aria-hidden="true"><rect x="2" width="6" height="22" rx="2" fill="#fff"/><rect x="12" width="6" height="22" rx="2" fill="#fff"/></svg></button>
+    <div id="clock" class="clock">1:00</div>
+    <div class="score" aria-label="Score">★ <span id="score">0</span></div>
+  </div>
+  <figure class="stage" id="stage">
+    <img id="cardImg" alt="" referrerpolicy="no-referrer" draggable="false">
+    <figcaption id="cardName"></figcaption>
+    <div class="timesup">Time's up!</div>
+  </figure>
+  <div class="acts" id="acts">
+    <button class="act skip" id="skipBtn">Skip</button>
+    <button class="act ok" id="okBtn">Correct!</button>
+  </div>
+</section>
+
+<section id="pause" class="screen center">
+  <h2>Paused</h2>
+  <p>The clock is stopped.</p>
+  <button id="resumeBtn" class="big">Keep playing</button>
+  <div class="row">
+    <button id="endBtn" class="ghost">End round</button>
+    <button id="quitBtn" class="ghost">Quit to menu</button>
+  </div>
+</section>
+
+<section id="results" class="screen scrolly">
+  <div class="res-in">
+    <p class="kicker" id="resKicker">Time's up!</p>
+    <div class="big-score"><b id="resScore">0</b><small id="resWord">correct</small></div>
+    <p id="resNote"></p>
+    <div class="res-btns">
+      <button id="againBtn" class="big">Next player</button>
+      <button id="homeBtn" class="ghost">Menu</button>
+    </div>
+    <ul id="resList" class="res-list"></ul>
+  </div>
+</section>
+
+<section id="gallery" class="screen scrolly">
+  <div class="gal-head">
+    <h2>The characters</h2>
+    <button id="galDone" class="ghost">Done</button>
+  </div>
+  <p class="gal-tip" id="galTip">Tap a character to leave it out of the game.</p>
+  <div id="galGrid" class="gal-grid"></div>
+</section>
+
+<script>
+{
+/* ---------- Characters ----------
+   [name shown, Wikipedia article, name on the Disney fan wiki API, prefer fan wiki first] */
+const F = 1;
+const DECKS = [
+ {id:'classic', label:'Classics', chars:[
+  ['Mickey Mouse','Mickey Mouse'],['Minnie Mouse','Minnie Mouse'],['Donald Duck','Donald Duck'],['Daisy Duck','Daisy Duck'],
+  ['Goofy','Goofy'],['Pluto','Pluto (Disney)'],['Chip and Dale',"Chip 'n' Dale",'Chip'],
+  ['Winnie the Pooh','Winnie the Pooh (Disney character)','Winnie the Pooh',F],['Tigger','Tigger','Tigger',F],
+  ['Eeyore','Eeyore','Eeyore',F],['Piglet','Piglet (Winnie-the-Pooh)','Piglet',F],['Dumbo','Dumbo (character)','Dumbo',F],
+  ['Bambi','Bambi (character)','Bambi',F],['Thumper','','Thumper',F],['Pinocchio','Pinocchio (Disney character)','Pinocchio',F],
+  ['Jiminy Cricket','Jiminy Cricket','Jiminy Cricket'],['Peter Pan','Peter Pan (Disney character)','Peter Pan',F],
+  ['Tinker Bell','Tinker Bell (Disney)','Tinker Bell',F],['Alice','','Alice',F],['Cheshire Cat','','Cheshire Cat',F],
+  ['Jack Skellington','Jack Skellington','Jack Skellington']
+ ]},
+ {id:'royal', label:'Princesses & Heroes', chars:[
+  ['Snow White','Snow White (Disney character)','Snow White'],['Cinderella','Cinderella (Disney character)','Cinderella'],
+  ['Aurora','Aurora (Sleeping Beauty)','Aurora'],['Ariel','Ariel (The Little Mermaid)','Ariel'],
+  ['Belle','Belle (Beauty and the Beast)','Belle'],['Jasmine','Princess Jasmine','Jasmine'],['Aladdin','Aladdin (Disney character)','Aladdin'],
+  ['Pocahontas','','Pocahontas',F],['Mulan','Fa Mulan (Disney)','Fa Mulan',F],['Tiana','Tiana (Disney character)','Tiana'],
+  ['Rapunzel','Rapunzel (Disney)','Rapunzel',F],['Merida','Merida (Brave)','Merida'],['Moana','Moana (Disney character)','Moana',F],
+  ['Elsa','Elsa (Frozen)','Elsa'],['Anna','Anna (Frozen)','Anna'],['Kristoff','','Kristoff',F],
+  ['Raya','','Raya',F],['Mirabel','Mirabel Madrigal','Mirabel Madrigal'],['Hercules','','Hercules',F],
+  ['Simba','Simba','Simba'],['Mowgli','','Mowgli',F],['Maui','','Maui',F]
+ ]},
+ {id:'pixar', label:'Pixar', chars:[
+  ['Woody','Sheriff Woody','Woody'],['Buzz Lightyear','Buzz Lightyear','Buzz Lightyear'],['Jessie','Jessie (Toy Story)','Jessie'],
+  ['Rex','','Rex',F],['Hamm','','Hamm',F],['Slinky Dog','','Slinky Dog',F],['Bo Peep','','Bo Peep',F],['Forky','','Forky',F],
+  ['Lightning McQueen','Lightning McQueen','Lightning McQueen'],['Mater','Mater (Cars)','Mater'],
+  ['Nemo','','Nemo',F],['Dory','','Dory',F],['Sulley','James P. Sullivan','James P. Sullivan'],['Mike Wazowski','Mike Wazowski','Mike Wazowski'],
+  ['Boo','','Boo',F],['WALL-E','WALL-E (character)','WALL-E'],['Remy','','Remy',F],['Mr. Incredible','Mr. Incredible','Bob Parr'],
+  ['Edna Mode','Edna Mode','Edna Mode'],['Joy','','Joy',F],['Sadness','','Sadness',F],['Anger','','Anger',F],
+  ['Miguel','','Miguel Rivera',F],['Russell','','Russell',F],['Dug','','Dug',F]
+ ]},
+ {id:'pals', label:'Pals & Sidekicks', chars:[
+  ['Stitch','Stitch (Lilo & Stitch)','Stitch'],['Lilo','Lilo Pelekai','Lilo Pelekai'],['Olaf','Olaf (Frozen)','Olaf'],['Sven','','Sven',F],
+  ['Genie','Genie (Aladdin)','Genie'],['Abu','','Abu',F],['Timon','','Timon',F],['Pumbaa','','Pumbaa',F],['Rafiki','','Rafiki',F],
+  ['Baloo','','Baloo',F],['Sebastian','','Sebastian',F],['Flounder','','Flounder',F],['Mushu','','Mushu',F],['Pascal','','Pascal',F],
+  ['Maximus','','Maximus',F],['Heihei','','Heihei',F],['Lumière','','Lumière',F],['Mrs. Potts','','Mrs. Potts',F],
+  ['Baymax','Baymax','Baymax'],['Judy Hopps','Judy Hopps','Judy Hopps'],['Nick Wilde','Nick Wilde','Nick Wilde'],
+  ['Wreck-It Ralph','Wreck-It Ralph (character)','Wreck-It Ralph'],['Vanellope','Vanellope von Schweetz','Vanellope von Schweetz'],
+  ['Bruno','Bruno Madrigal','Bruno Madrigal'],['Dopey','','Dopey',F],['Grumpy','','Grumpy',F],['Figment','','Figment',F]
+ ]},
+ {id:'villains', label:'Villains', chars:[
+  ['Maleficent','Maleficent','Maleficent'],['Ursula','Ursula (The Little Mermaid)','Ursula'],['Jafar','Jafar (Aladdin)','Jafar'],
+  ['Scar','Scar (The Lion King)','Scar'],['Captain Hook','','Captain Hook',F],['Cruella de Vil','','Cruella De Vil',F],
+  ['Evil Queen','','Evil Queen',F],['Hades','Hades (Disney)','Hades'],['Gaston','Gaston (Beauty and the Beast)','Gaston'],
+  ['Mother Gothel','Mother Gothel','Mother Gothel'],['Dr. Facilier','Doctor Facilier','Dr. Facilier'],['Yzma','Yzma','Yzma'],
+  ['Lady Tremaine','Lady Tremaine','Lady Tremaine'],['Queen of Hearts','','Queen of Hearts',F],['Shere Khan','','Shere Khan',F],
+  ['Oogie Boogie','','Oogie Boogie',F]
+ ]},
+ {id:'galaxy', label:'Star Wars & Marvel', chars:[
+  ['Darth Vader','Darth Vader','Darth Vader'],['Yoda','Yoda','Yoda'],['Chewbacca','Chewbacca','Chewbacca'],['R2-D2','R2-D2','R2-D2'],
+  ['C-3PO','C-3PO','C-3PO'],['BB-8','BB-8','BB-8'],['Grogu','Grogu','Grogu'],['Stormtrooper','Stormtrooper (Star Wars)','Stormtrooper'],
+  ['Spider-Man','Spider-Man','Spider-Man'],['Iron Man','Iron Man','Iron Man'],['Captain America','Captain America','Captain America'],
+  ['Hulk','Hulk','Hulk'],['Black Panther','Black Panther (character)','Black Panther'],['Groot','Groot','Groot']
+ ]}
+].map(d=>({...d,chars:d.chars.map(([n,w,dn,pref])=>({n,w:w||'',d:dn||n,pref:!!pref,deck:d.id}))}));
+const ALL = DECKS.flatMap(d=>d.chars);
+
+/* ---------- Storage ---------- */
+const store={get(k,f){try{const v=localStorage.getItem(k);return v==null?f:JSON.parse(v)}catch(e){return f}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const settings=Object.assign({len:60,decks:DECKS.map(d=>d.id),names:true,sound:true},store.get('who-settings',{}));
+const saveSettings=()=>store.set('who-settings',settings);
+const imgMap=store.get('who-img-v1',{});        // name -> picture URL
+const failed=store.get('who-fail-v1',{});       // name -> time we last found nothing
+const off=new Set(store.get('who-off',[]));
+let best=store.get('who-best',{});
+const FAIL_TTL=3*864e5;
+let namesOnly=false;
+
+const $=id=>document.getElementById(id);
+const screens=['home','loading','count','play','pause','results','gallery'];
+function show(id){screens.forEach(s=>$(s).classList.toggle('on',s===id))}
+const fmt=ms=>{const s=Math.max(0,Math.ceil(ms/1000));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const activeChars=()=>ALL.filter(c=>settings.decks.includes(c.deck));
+
+/* ---------- Finding pictures ---------- */
+async function getJSON(url,ms=9000){
+  const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),ms);
+  try{const r=await fetch(url,{signal:ctl.signal});if(!r.ok)throw new Error(r.status);return await r.json()}finally{clearTimeout(t)}
+}
+async function wikiBatch(titles){
+  const u='https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&origin=*&redirects=1'+
+    '&prop=pageimages&piprop=thumbnail|original&pithumbsize=640&pilicense=any&titles='+encodeURIComponent(titles.join('|'));
+  const q=(await getJSON(u)).query||{};const norm={},red={},pages={};
+  (q.normalized||[]).forEach(x=>norm[x.from]=x.to);(q.redirects||[]).forEach(x=>red[x.from]=x.to);
+  (q.pages||[]).forEach(p=>{const s=(p.thumbnail&&p.thumbnail.source)||(p.original&&p.original.source);if(s&&!/\.svg/i.test(s))pages[p.title]=s});
+  const out={};titles.forEach(t=>{let k=norm[t]||t;k=red[k]||k;if(pages[k])out[t]=pages[k]});return out;
+}
+async function fanLookup(name){
+  const j=await getJSON('https://api.disneyapi.dev/character?name='+encodeURIComponent(name));
+  let arr=Array.isArray(j.data)?j.data:(j.data?[j.data]:[]);arr=arr.filter(c=>c&&c.imageUrl&&c.name);
+  const low=name.toLowerCase();
+  const hit=arr.find(c=>c.name.toLowerCase()===low)||arr.filter(c=>c.name.toLowerCase().startsWith(low+' ')).sort((a,b)=>a.name.length-b.name.length)[0];
+  return hit?hit.imageUrl:null;
+}
+async function pool(items,n,fn){let i=0;await Promise.all(Array.from({length:Math.min(n,items.length)},async()=>{while(i<items.length){await fn(items[i++])}}))}
+
+async function resolveChars(list,onProg){
+  const now=Date.now();
+  const need=list.filter(c=>!imgMap[c.n]&&!(failed[c.n]&&now-failed[c.n]<FAIL_TTL));
+  let finished=list.length-need.length,reached=false;
+  const prog=()=>onProg(finished,list.length);prog();
+  const wikiThen=[],fanThen=[];
+  need.forEach(c=>(c.pref||!c.w?fanThen:wikiThen).push(c));
+  const afterWiki=[],afterFan=[];
+  for(let i=0;i<wikiThen.length;i+=40){
+    const chunk=wikiThen.slice(i,i+40);let r={};
+    try{r=await wikiBatch(chunk.map(c=>c.w));reached=true}catch(e){}
+    chunk.forEach(c=>{if(r[c.w]){imgMap[c.n]=r[c.w];finished++}else afterWiki.push(c)});prog();
+  }
+  await pool([...fanThen,...afterWiki],4,async c=>{
+    let u=null;try{u=await fanLookup(c.d);reached=true}catch(e){}
+    if(u){imgMap[c.n]=u;finished++}else if(c.pref&&c.w)afterFan.push(c);else{finished++;if(reached)failed[c.n]=Date.now()}
+    prog();
+  });
+  for(let i=0;i<afterFan.length;i+=40){
+    const chunk=afterFan.slice(i,i+40);let r={};
+    try{r=await wikiBatch(chunk.map(c=>c.w));reached=true}catch(e){}
+    chunk.forEach(c=>{finished++;if(r[c.w])imgMap[c.n]=r[c.w];else if(reached)failed[c.n]=Date.now()});prog();
+  }
+  store.set('who-img-v1',imgMap);store.set('who-fail-v1',failed);
+  return reached;
+}
+const goodImg=new Set();
+function loadImg(url,ms=10000){
+  if(goodImg.has(url))return Promise.resolve(url);
+  return new Promise((res,rej)=>{
+    const im=new Image();im.referrerPolicy='no-referrer';
+    const t=setTimeout(()=>{im.src='';rej(new Error('timeout'))},ms);
+    im.onload=()=>{clearTimeout(t);if(im.naturalWidth<8){rej(new Error('tiny'));return}goodImg.add(url);res(url)};
+    im.onerror=()=>{clearTimeout(t);rej(new Error('load'))};im.src=url;
+  });
+}
+function dropPicture(c){delete imgMap[c.n];store.set('who-img-v1',imgMap)}
+function warmAll(list){ // fetch every picture quietly so the next cards are instant (and saved for poor signal)
+  pool(shuffle(list.filter(c=>imgMap[c.n])),2,async c=>{try{await loadImg(imgMap[c.n],15000)}catch(e){}});
+}
+
+/* ---------- Sound, wake lock ---------- */
+let ac=null;
+function audio(){if(!ac){try{ac=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(ac&&ac.state==='suspended')ac.resume().catch(()=>{});return ac}
+function tone(f,d,type='triangle',when=0,vol=.3){
+  if(!settings.sound)return;const a=audio();if(!a)return;const t=a.currentTime+when;
+  const o=a.createOscillator(),g=a.createGain();o.type=type;o.frequency.setValueAtTime(f,t);
+  g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+.012);g.gain.exponentialRampToValueAtTime(.0001,t+d);
+  o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+d+.03);
+}
+const buzz=p=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
+const sfx={
+  tick:()=>tone(660,.14),go:()=>tone(990,.3),
+  ok:()=>{tone(880,.12);tone(1320,.25,'triangle',.11);buzz(40)},
+  skip:()=>{tone(420,.12,'square',0,.12);tone(300,.2,'square',.11,.12);buzz(30)},
+  warn:()=>tone(540,.08,'square',0,.12),
+  end:()=>{tone(220,.8,'sawtooth',0,.25);tone(165,.8,'sawtooth',0,.2);buzz([200,80,200])}
+};
+let wl=null;
+async function wake(){try{if('wakeLock' in navigator&&!document.hidden&&!wl){wl=await navigator.wakeLock.request('screen');wl.addEventListener('release',()=>wl=null)}}catch(e){}}
+function goFull(){
+  const el=document.documentElement;
+  if(document.fullscreenEnabled&&!document.fullscreenElement&&el.requestFullscreen){
+    el.requestFullscreen({navigationUI:'hide'}).then(()=>{try{screen.orientation.lock('landscape').catch(()=>{})}catch(e){}}).catch(()=>{});
+  }
+}
+
+/* ---------- Game ---------- */
+let G=null,bag=[],bagKey='';
+const clock={remaining:0,startedAt:null};
+const clockStart=()=>{if(clock.startedAt==null)clock.startedAt=performance.now()};
+const clockStop=()=>{if(clock.startedAt!=null){clock.remaining-=performance.now()-clock.startedAt;clock.startedAt=null}};
+const clockLeft=()=>clock.startedAt==null?clock.remaining:clock.remaining-(performance.now()-clock.startedAt);
+
+const playable=()=>activeChars().filter(c=>!off.has(c.n)&&(namesOnly||imgMap[c.n]));
+function drawChar(){
+  if(!bag.length){bag=shuffle(playable());
+    if(G&&G.cur&&bag.length>1&&bag[bag.length-1]===G.cur.c)bag.unshift(bag.pop());}
+  return bag.pop()||null;
+}
+async function prepareNext(){
+  for(let tries=0;tries<15;tries++){
+    const c=drawChar();if(!c)return null;
+    if(namesOnly)return{c,url:null};
+    const url=imgMap[c.n];if(!url)continue;
+    try{await loadImg(url);return{c,url}}catch(e){if(navigator.onLine!==false)dropPicture(c)}
+  }
+  return null;
+}
+
+let cdEnd=0,cdShown=0;
+function startCountdown(kind){
+  G.phase='count';G.seq++;G.waiting=false;
+  const b=$('cdBanner');b.className='banner'+(kind?' '+kind:'');
+  b.textContent=kind==='ok'?'✓ Correct!':kind==='skip'?'Skipped':'';
+  $('cdMsg').textContent=G.cards.length||G.resumed?'Back on your forehead!':'Put it on your forehead!';
+  G.resumed=false;
+  $('cdClock').textContent=fmt(clockLeft());
+  if(!G.pending)G.pending=prepareNext();
+  cdEnd=performance.now()+3000;cdShown=0;
+  show('count');
+}
+function showCard(p){
+  if(!p){finishRound(true);return}
+  G.cur=p;
+  const st=$('stage');st.classList.toggle('nameonly',!p.url);
+  const img=$('cardImg');if(p.url)img.src=p.url;else img.removeAttribute('src');
+  $('cardName').textContent=(settings.names||!p.url)?p.c.n:'';
+  $('score').textContent=G.score;
+  $('play').classList.remove('over');
+  G.phase='card';G.shownAt=performance.now();
+  $('acts').classList.add('wait');setTimeout(()=>$('acts').classList.remove('wait'),700);
+  show('play');sfx.go();clockStart();renderClock();
+  G.pending=G.queued||prepareNext();G.queued=null;
+}
+function answer(r){
+  if(!G||G.phase!=='card'||performance.now()-G.shownAt<700)return;
+  clockStop();
+  G.cards.push({c:G.cur.c,url:G.cur.url,r});
+  if(r==='ok'){G.score++;sfx.ok()}else sfx.skip();
+  if(clockLeft()<=0){finishRound();return}
+  startCountdown(r);
+}
+let lastWarn=0;
+function renderClock(){
+  const left=clockLeft(),el=$('clock');el.textContent=fmt(left);
+  el.classList.toggle('hot',left<=10000);
+  const s=Math.ceil(left/1000);
+  if(left<=5000&&left>0&&s!==lastWarn){lastWarn=s;sfx.warn()}
+}
+function timeUp(){
+  clockStop();clock.remaining=0;G.phase='over';
+  if(G.cur)G.cards.push({c:G.cur.c,url:G.cur.url,r:'time'});
+  sfx.end();$('clock').textContent='0:00';$('play').classList.add('over');
+  setTimeout(()=>finishRound(),1600);
+}
+function finishRound(outOfCards){
+  if(!G)return;G.phase='done';clockStop();
+  const n=G.score;$('resScore').textContent=n;
+  $('resKicker').textContent=outOfCards?'Out of characters!':"Time's up!";
+  const key=String(settings.len);const prev=best[key]||0;
+  let note='';
+  if(n>prev&&n>0){best[key]=n;store.set('who-best',best);note=prev?`New best for a ${lenLabel(settings.len)} round!`:'';}
+  else if(prev)note=`Best ${lenLabel(settings.len)} round so far: ${prev}.`;
+  const skips=G.cards.filter(x=>x.r==='skip').length;
+  $('resNote').textContent=[note,skips?`${skips} skipped.`:''].filter(Boolean).join(' ');
+  $('resList').innerHTML='';
+  G.cards.forEach(x=>{
+    const li=document.createElement('li');li.className='r-'+x.r;
+    if(x.url){const im=document.createElement('img');im.referrerPolicy='no-referrer';im.alt='';im.src=x.url;li.append(im)}
+    const sp=document.createElement('span');sp.textContent=x.c.n;
+    const em=document.createElement('em');em.textContent=x.r==='ok'?'✓':x.r==='skip'?'Skip':'Time';
+    li.append(sp,em);$('resList').append(li);
+  });
+  show('results');renderBest();
+}
+function pause(){
+  if(!G||(G.phase!=='card'&&G.phase!=='count'))return;
+  if(G.phase==='card'){clockStop();G.queued=G.pending;G.pending=Promise.resolve(G.cur)}
+  G.phase='paused';G.seq++;show('pause');
+}
+function resume(){if(G&&G.phase==='paused'){G.resumed=true;wake();startCountdown('')}}
+
+async function newRound(){
+  const key=playable().map(c=>c.n).join('|');
+  if(key!==bagKey){bag=[];bagKey=key}
+  G={cards:[],score:0,phase:'',seq:0,pending:null,queued:null,cur:null};
+  clock.remaining=settings.len*1000;clock.startedAt=null;lastWarn=0;
+  startCountdown('');
+}
+async function start(){
+  audio();wake();goFull();
+  const chars=activeChars().filter(c=>!off.has(c.n));
+  if(!chars.length){flash($('deckChips'));return}
+  if(!namesOnly){
+    const ready=chars.filter(c=>imgMap[c.n]).length;
+    if(ready<chars.length){
+      const quick=ready>=Math.min(12,chars.length);
+      if(!quick){
+        show('loading');$('loadErr').hidden=true;$('loadSpin').hidden=false;$('loadMsg').textContent='Getting the pictures ready…';
+        await resolveChars(chars,(a,b)=>{$('loadBar').style.width=(b?a/b*100:100)+'%'});
+      }else resolveChars(chars,()=>{}).then(()=>warmAll(playable()));
+    }
+    if(!playable().length){
+      show('loading');$('loadSpin').hidden=true;$('loadMsg').textContent='';$('loadErr').hidden=false;return;
+    }
+    warmAll(playable());
+  }
+  newRound();
+}
+function flash(el){el.animate&&el.animate([{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'none'}],{duration:300})}
+
+/* Main loop: countdown and game clock (clock only runs while a card is showing) */
+setInterval(()=>{
+  if(!G)return;
+  if(G.phase==='count'){
+    const left=cdEnd-performance.now();
+    if(left>0){
+      const n=Math.ceil(left/1000);
+      if(n!==cdShown){cdShown=n;const el=$('cdNum');el.textContent=n;el.classList.remove('pop');void el.offsetWidth;el.classList.add('pop');sfx.tick()}
+    }else if(!G.waiting){
+      G.waiting=true;const seq=G.seq;const p=G.pending;
+      let settled=false;
+      setTimeout(()=>{if(!settled&&G.seq===seq&&G.phase==='count'){$('cdNum').textContent='…';$('cdMsg').textContent='Loading the picture…'}},250);
+      p.then(r=>{settled=true;if(G&&G.seq===seq&&G.phase==='count')showCard(r)});
+    }
+  }else if(G.phase==='card'){
+    renderClock();if(clockLeft()<=0)timeUp();
+  }
+},50);
+
+/* Buttons: count a quick tap only, so fingers resting on the screen don't trigger them */
+function tap(el,fn){
+  let t0=0,pid=null;
+  el.addEventListener('pointerdown',e=>{t0=performance.now();pid=e.pointerId});
+  el.addEventListener('pointerup',e=>{if(e.pointerId===pid&&performance.now()-t0<800)fn();pid=null});
+  el.addEventListener('pointercancel',()=>pid=null);
+  el.addEventListener('contextmenu',e=>e.preventDefault());
+  el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fn()}});
+}
+tap($('okBtn'),()=>answer('ok'));
+tap($('skipBtn'),()=>answer('skip'));
+$('pauseBtn').addEventListener('click',pause);
+$('resumeBtn').addEventListener('click',resume);
+$('endBtn').addEventListener('click',()=>{if(G){G.seq++;finishRound()}});
+$('quitBtn').addEventListener('click',()=>{G=null;show('home')});
+$('againBtn').addEventListener('click',()=>{audio();wake();newRound()});
+$('homeBtn').addEventListener('click',()=>{G=null;show('home')});
+$('startBtn').addEventListener('click',start);
+$('retryBtn').addEventListener('click',()=>{Object.keys(failed).forEach(k=>delete failed[k]);store.set('who-fail-v1',failed);start()});
+$('namesOnlyBtn').addEventListener('click',()=>{namesOnly=true;newRound()});
+$('loadHome').addEventListener('click',()=>show('home'));
+document.addEventListener('keydown',e=>{
+  if(!G)return;
+  if(G.phase==='card'&&(e.key==='ArrowRight'))answer('ok');
+  if(G.phase==='card'&&(e.key==='ArrowLeft'))answer('skip');
+  if(e.key==='Escape'||e.key==='p')G.phase==='paused'?resume():pause();
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();else if(G)wake()});
+
+/* ---------- Home ---------- */
+const LENS=[60,90,120];
+const lenLabel=s=>s===120?'2-minute':s+'-second';
+function renderHome(){
+  $('lenSeg').innerHTML=LENS.map(s=>`<button data-len="${s}" aria-pressed="${settings.len===s}">${s===120?'2 min':s+' sec'}</button>`).join('');
+  $('deckChips').innerHTML=DECKS.map(d=>{const n=d.chars.filter(c=>!off.has(c.n)).length;
+    return `<button class="chip" data-deck="${d.id}" aria-pressed="${settings.decks.includes(d.id)}">${d.label} <small>${n}</small></button>`}).join('');
+  $('optNames').setAttribute('aria-pressed',settings.names);$('optSound').setAttribute('aria-pressed',settings.sound);
+  renderBest();
+}
+function renderBest(){const b=best[String(settings.len)];$('bestLine').textContent=b?`Best ${lenLabel(settings.len)} round so far: ${b} correct.`:''}
+$('lenSeg').addEventListener('click',e=>{const b=e.target.closest('[data-len]');if(!b)return;settings.len=+b.dataset.len;saveSettings();renderHome()});
+$('deckChips').addEventListener('click',e=>{const b=e.target.closest('[data-deck]');if(!b)return;const id=b.dataset.deck;
+  settings.decks=settings.decks.includes(id)?settings.decks.filter(x=>x!==id):[...settings.decks,id];saveSettings();renderHome()});
+$('optNames').addEventListener('click',()=>{settings.names=!settings.names;saveSettings();renderHome()});
+$('optSound').addEventListener('click',()=>{settings.sound=!settings.sound;saveSettings();renderHome();if(settings.sound){audio();sfx.ok()}});
+
+/* ---------- Gallery ---------- */
+async function openGallery(){
+  show('loading');$('loadErr').hidden=true;$('loadSpin').hidden=false;$('loadMsg').textContent='Getting the pictures ready…';
+  await resolveChars(ALL,(a,b)=>{$('loadBar').style.width=(b?a/b*100:100)+'%'});
+  const grid=$('galGrid');grid.innerHTML='';
+  DECKS.forEach(d=>{
+    const h=document.createElement('h3');h.className='gal-group';h.textContent=d.label;grid.append(h);
+    d.chars.forEach(c=>{
+      const b=document.createElement('button');b.className='tile'+(off.has(c.n)?' off':'');
+      const url=imgMap[c.n];
+      if(url){const im=document.createElement('img');im.loading='lazy';im.referrerPolicy='no-referrer';im.alt='';im.src=url;
+        im.onerror=()=>{const ph=document.createElement('div');ph.className='ph';ph.textContent='No picture';im.replaceWith(ph)};b.append(im)}
+      else{const ph=document.createElement('div');ph.className='ph';ph.textContent='No picture';b.append(ph)}
+      const s=document.createElement('span');s.textContent=c.n;b.append(s);
+      b.addEventListener('click',()=>{off.has(c.n)?off.delete(c.n):off.add(c.n);b.classList.toggle('off');store.set('who-off',[...off])});
+      grid.append(b);
+    });
+  });
+  const missing=ALL.filter(c=>!imgMap[c.n]).length;
+  $('galTip').textContent='Tap a character to leave it out of the game.'+(missing?` Characters marked "No picture" are skipped automatically.`:'');
+  show('gallery');
+}
+$('galleryBtn').addEventListener('click',openGallery);
+$('galDone').addEventListener('click',()=>{renderHome();show('home')});
+
+renderHome();
+if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>
