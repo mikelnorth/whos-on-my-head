@@ -160,6 +160,7 @@ h2{font-size:15px;margin:4px 0 0;font-weight:600;opacity:.85}
       <div class="opts">
         <button class="opt" id="optNames" aria-pressed="true">Show name under picture</button>
         <button class="opt" id="optSound" aria-pressed="true">Sounds</button>
+        <button class="opt" id="optTilt" aria-pressed="true">Tilt to answer</button>
       </div>
     </div>
     <button id="startBtn" class="big">Play!</button>
@@ -169,7 +170,7 @@ h2{font-size:15px;margin:4px 0 0;font-weight:600;opacity:.85}
         <li>Turn the phone sideways and tap <b>Play</b>.</li>
         <li>During the 3-2-1, hold it on your forehead, screen facing out.</li>
         <li>Everyone else describes the character in the picture.</li>
-        <li>Got it? Bring the phone down and tap <b>Correct</b> or <b>Skip</b>. The clock stops while you get ready for the next one.</li>
+        <li>Got it? Tip the phone <b>down</b> (screen to the floor) for <b>Correct</b>, or <b>up</b> (screen to the sky) to <b>Skip</b>. You can also tap the buttons. The clock stops while you get ready for the next one.</li>
       </ol>
       <p class="fine" id="bestLine"></p>
       <p class="fine">A fan-made game, not affiliated with Disney. Pictures load from Wikipedia and the Disney fan wiki the first time you play; after that, most are saved on your phone.</p>
@@ -194,6 +195,7 @@ h2{font-size:15px;margin:4px 0 0;font-weight:600;opacity:.85}
   <div id="cdNum" class="cdnum">3</div>
   <p id="cdMsg">Put it on your forehead!</p>
   <p class="cd-clock"><span id="cdClock">1:00</span> left · clock paused</p>
+  <p class="cd-clock" id="cdTilt" hidden>Tip down = Correct · Tip up = Skip</p>
 </section>
 
 <section id="play" class="screen">
@@ -528,7 +530,7 @@ const PICS={
 
 /* ---------- Storage ---------- */
 const store={get(k,f){try{const v=localStorage.getItem(k);return v==null?f:JSON.parse(v)}catch(e){return f}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
-const settings=Object.assign({len:60,decks:DECKS.map(d=>d.id),names:true,sound:true},store.get('who-settings',{}));
+const settings=Object.assign({len:60,decks:DECKS.map(d=>d.id),names:true,sound:true,tilt:true},store.get('who-settings',{}));
 const saveSettings=()=>store.set('who-settings',settings);
 const imgMap=store.get('who-img-v1',{});        // name -> picture URL
 const failed=store.get('who-fail-v1',{});       // name -> time we last found nothing
@@ -639,6 +641,43 @@ function goFull(){
   }
 }
 
+
+/* ---------- Tilt to answer (like Heads Up) ----------
+   Phone is sideways on the forehead, screen facing out. Tip the screen toward the floor = Correct,
+   toward the sky = Skip. Uses the gravity reading, which stays steady when the phone is upright. */
+const isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const hasMotion='DeviceMotionEvent' in window;
+const TILT_GO=45,TILT_ARM=22,TILT_HOLD=120;
+// up = sign of gravity's z reading when the screen faces the sky (iOS and Android disagree, so we learn it)
+const tilt={live:false,asked:false,up:isIOS?-1:1,p:0,armed:false,dir:0,since:0,base:0,hist:[]};
+function onMotion(e){
+  const g=e.accelerationIncludingGravity;if(!g||g.z==null)return;
+  const m=Math.hypot(g.x||0,g.y||0,g.z);if(m<5||m>15)return; // ignore bumps and jolts
+  tilt.live=true;const zn=g.z/m;
+  if(!G||G.phase==='done'||G.phase==='paused'){if(Math.abs(zn)>.55)tilt.up=Math.sign(zn);return} // phone in hand, screen up
+  const p=Math.asin(Math.max(-1,Math.min(1,-zn*tilt.up)))*180/Math.PI; // + screen to floor, - screen to sky
+  tilt.p=tilt.p*.6+p*.4;
+  if(G.phase==='count'){tilt.hist.push(tilt.p);if(tilt.hist.length>20)tilt.hist.shift();return}
+  if(G.phase!=='card'||!settings.tilt)return;
+  const d=tilt.p-tilt.base,now=performance.now();
+  if(!tilt.armed){if(Math.abs(d)<TILT_ARM){tilt.armed=true;tilt.dir=0}return}
+  const dir=d>TILT_GO?1:d<-TILT_GO?-1:0;
+  if(dir!==tilt.dir){tilt.dir=dir;tilt.since=now;return}
+  if(dir&&now-tilt.since>=TILT_HOLD){const ph=G.seq;answer(dir>0?'ok':'skip');if(G&&G.seq!==ph){tilt.armed=false;tilt.dir=0}}
+}
+function tiltCardShown(){ // the head position during the end of the 3-2-1 is "straight"
+  const h=tilt.hist.filter(p=>Math.abs(p)<30).sort((a,b)=>a-b);const mid=h.length>=5?h[h.length>>1]:0;
+  tilt.base=Math.max(-20,Math.min(20,mid));tilt.armed=false;tilt.dir=0;tilt.hist=[];
+}
+function enableTilt(){ // must run inside a tap (iPhone asks permission)
+  if(!settings.tilt||!hasMotion||tilt.asked)return;
+  tilt.asked=true;
+  if(typeof DeviceMotionEvent.requestPermission==='function'){
+    DeviceMotionEvent.requestPermission().then(r=>{if(r==='granted')window.addEventListener('devicemotion',onMotion)}).catch(()=>{tilt.asked=false});
+  }else window.addEventListener('devicemotion',onMotion);
+}
+if(hasMotion&&typeof DeviceMotionEvent.requestPermission!=='function'){tilt.asked=true;window.addEventListener('devicemotion',onMotion)}
+
 /* ---------- Game ---------- */
 let G=null,bag=[],bagKey='';
 const clock={remaining:0,startedAt:null};
@@ -669,6 +708,7 @@ function startCountdown(kind){
   b.textContent=kind==='ok'?'✓ Correct!':kind==='skip'?'Skipped':'';
   $('cdMsg').textContent=G.cards.length||G.resumed?'Back on your forehead!':'Put it on your forehead!';
   G.resumed=false;
+  $('cdTilt').hidden=!(settings.tilt&&tilt.live);
   $('cdClock').textContent=fmt(clockLeft());
   if(!G.pending)G.pending=prepareNext();
   cdEnd=performance.now()+3000;cdShown=0;
@@ -682,7 +722,7 @@ function showCard(p){
   $('cardName').textContent=(settings.names||!p.url)?p.c.n:'';
   $('score').textContent=G.score;
   $('play').classList.remove('over');
-  G.phase='card';G.shownAt=performance.now();
+  G.phase='card';G.shownAt=performance.now();tiltCardShown();
   $('acts').classList.add('wait');setTimeout(()=>$('acts').classList.remove('wait'),700);
   show('play');sfx.go();clockStart();renderClock();
   G.pending=G.queued||prepareNext();G.queued=null;
@@ -733,7 +773,7 @@ function pause(){
   if(G.phase==='card'){clockStop();G.queued=G.pending;G.pending=Promise.resolve(G.cur)}
   G.phase='paused';G.seq++;show('pause');
 }
-function resume(){if(G&&G.phase==='paused'){G.resumed=true;wake();startCountdown('')}}
+function resume(){if(G&&G.phase==='paused'){G.resumed=true;enableTilt();wake();startCountdown('')}}
 
 async function newRound(){
   const key=playable().map(c=>c.n).join('|');
@@ -743,7 +783,7 @@ async function newRound(){
   startCountdown('');
 }
 async function start(){
-  audio();wake();goFull();
+  enableTilt();audio();wake();goFull();
   const chars=activeChars().filter(c=>!off.has(c.n));
   if(!chars.length){flash($('deckChips'));return}
   if(!namesOnly){
@@ -798,7 +838,7 @@ $('pauseBtn').addEventListener('click',pause);
 $('resumeBtn').addEventListener('click',resume);
 $('endBtn').addEventListener('click',()=>{if(G){G.seq++;finishRound()}});
 $('quitBtn').addEventListener('click',()=>{G=null;show('home')});
-$('againBtn').addEventListener('click',()=>{audio();wake();newRound()});
+$('againBtn').addEventListener('click',()=>{enableTilt();audio();wake();newRound()});
 $('homeBtn').addEventListener('click',()=>{G=null;show('home')});
 $('startBtn').addEventListener('click',start);
 $('retryBtn').addEventListener('click',()=>{Object.keys(failed).forEach(k=>delete failed[k]);store.set('who-fail-v1',failed);start()});
@@ -819,7 +859,7 @@ function renderHome(){
   $('lenSeg').innerHTML=LENS.map(s=>`<button data-len="${s}" aria-pressed="${settings.len===s}">${s===120?'2 min':s+' sec'}</button>`).join('');
   $('deckChips').innerHTML=DECKS.map(d=>{const n=d.chars.filter(c=>!off.has(c.n)).length;
     return `<button class="chip" data-deck="${d.id}" aria-pressed="${settings.decks.includes(d.id)}">${d.label} <small>${n}</small></button>`}).join('');
-  $('optNames').setAttribute('aria-pressed',settings.names);$('optSound').setAttribute('aria-pressed',settings.sound);
+  $('optNames').setAttribute('aria-pressed',settings.names);$('optSound').setAttribute('aria-pressed',settings.sound);$('optTilt').setAttribute('aria-pressed',settings.tilt!==false);
   renderBest();
 }
 function renderBest(){const b=best[String(settings.len)];$('bestLine').textContent=b?`Best ${lenLabel(settings.len)} round so far: ${b} correct.`:''}
@@ -827,6 +867,7 @@ $('lenSeg').addEventListener('click',e=>{const b=e.target.closest('[data-len]');
 $('deckChips').addEventListener('click',e=>{const b=e.target.closest('[data-deck]');if(!b)return;const id=b.dataset.deck;
   settings.decks=settings.decks.includes(id)?settings.decks.filter(x=>x!==id):[...settings.decks,id];saveSettings();renderHome()});
 $('optNames').addEventListener('click',()=>{settings.names=!settings.names;saveSettings();renderHome()});
+$('optTilt').addEventListener('click',()=>{settings.tilt=settings.tilt===false;saveSettings();renderHome();if(settings.tilt)enableTilt()});
 $('optSound').addEventListener('click',()=>{settings.sound=!settings.sound;saveSettings();renderHome();if(settings.sound){audio();sfx.ok()}});
 
 /* ---------- Gallery ---------- */
